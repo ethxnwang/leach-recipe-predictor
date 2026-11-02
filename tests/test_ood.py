@@ -16,12 +16,16 @@ def test_out_of_range_feature_flagged(cfg, small_df):
 def test_unseen_category_flagged(cfg, small_df):
     seen = small_df[small_df["feed_type"] != "C"]
     det = OODDetector.fit(seen, cfg)
-    reasons = det.feed_reasons({"feed_type": "C", "feed_metal_grade_pct": 3.0, "particle_size_um": 120.0})
+    reasons = det.feed_reasons(
+        {"feed_type": "C", "feed_metal_grade_pct": 3.0, "particle_size_um": 120.0}
+    )
     assert any("feed_type" in r for r in reasons)
 
 
 def test_extreme_feed_composition_flagged(cfg, small_df):
     det = OODDetector.fit(small_df, cfg)
-    reasons = det.feed_reasons({"feed_type": "A", "feed_metal_grade_pct": 40.0, "particle_size_um": 4000.0})
+    reasons = det.feed_reasons(
+        {"feed_type": "A", "feed_metal_grade_pct": 40.0, "particle_size_um": 4000.0}
+    )
     assert any("Mahalanobis" in r for r in reasons)
     assert any("particle_size_um" in r for r in reasons)

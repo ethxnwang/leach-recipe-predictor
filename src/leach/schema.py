@@ -33,7 +33,9 @@ def _field_specs(cfg: Config, columns: list[str]) -> dict[str, tuple]:
 
 def build_feed_model(cfg: Config) -> type[BaseModel]:
     """Pydantic model for a feedstock description."""
-    return create_model("FeedComposition", __config__=_MODEL_CONFIG, **_field_specs(cfg, feed_columns(cfg)))
+    return create_model(
+        "FeedComposition", __config__=_MODEL_CONFIG, **_field_specs(cfg, feed_columns(cfg))
+    )
 
 
 def build_record_model(cfg: Config, require_target: bool = False) -> type[BaseModel]:

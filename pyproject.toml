@@ -41,7 +41,13 @@ src = ["src", "tests", "app"]
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["typer.Option", "typer.Argument"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
-filterwarnings = ["ignore::UserWarning:sklearn.*"]
+filterwarnings = [
+    "ignore::UserWarning:sklearn.*",
+    "ignore:Using `httpx` with `starlette.testclient`",
+]

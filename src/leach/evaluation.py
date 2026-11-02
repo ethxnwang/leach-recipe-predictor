@@ -29,7 +29,9 @@ def regression_metrics(y_true, y_pred) -> dict[str, float]:
     }
 
 
-def holdout_split(groups: np.ndarray, test_fraction: float, seed: int) -> tuple[np.ndarray, np.ndarray]:
+def holdout_split(
+    groups: np.ndarray, test_fraction: float, seed: int
+) -> tuple[np.ndarray, np.ndarray]:
     """Hold out whole batches: no batch appears in both train and test."""
     gss = GroupShuffleSplit(n_splits=1, test_size=test_fraction, random_state=seed)
     return next(gss.split(np.zeros(len(groups)), groups=groups))

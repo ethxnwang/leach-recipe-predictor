@@ -34,11 +34,17 @@ logger = logging.getLogger(__name__)
 
 def git_info(root: Path) -> dict:
     """Current commit and whether tracked files differ from it ("unknown" outside git)."""
+
     def run(*args: str) -> str:
-        return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
-                              check=True).stdout.strip()
+        return subprocess.run(
+            ["git", *args], cwd=root, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
     try:
-        return {"commit": run("rev-parse", "HEAD"), "dirty": bool(run("status", "--porcelain", "-uno"))}
+        return {
+            "commit": run("rev-parse", "HEAD"),
+            "dirty": bool(run("status", "--porcelain", "-uno")),
+        }
     except (subprocess.CalledProcessError, FileNotFoundError):
         return {"commit": "unknown", "dirty": None}
 
@@ -52,7 +58,9 @@ def _xyg(df: pd.DataFrame, cfg: Config) -> tuple[pd.DataFrame, np.ndarray, np.nd
     return df[feature_columns(cfg)], df[f["target"]].to_numpy(float), df[f["group"]].to_numpy()
 
 
-def fit_bundle(train_df: pd.DataFrame, cfg: Config, model_name: str, seed: int) -> tuple[ModelBundle, dict]:
+def fit_bundle(
+    train_df: pd.DataFrame, cfg: Config, model_name: str, seed: int
+) -> tuple[ModelBundle, dict]:
     """Tune ``model_name`` on ``train_df`` and attach intervals + OOD detector."""
     X, y, g = _xyg(train_df, cfg)
     unc = cfg["uncertainty"]
@@ -91,10 +99,17 @@ def evaluate_holdout(bundle: ModelBundle, test_df: pd.DataFrame, cfg: Config) ->
     }
 
 
-def _learning_curve(cfg: Config, pool: pd.DataFrame, best: str, best_params: dict, cv_folds: pd.DataFrame, seed: int) -> pd.DataFrame:
+def _learning_curve(
+    cfg: Config, pool: pd.DataFrame, best: str, best_params: dict, cv_folds: pd.DataFrame, seed: int
+) -> pd.DataFrame:
     lc = cfg["model"]["learning_curve"]
-    eval_df = simulate_trials(cfg, n_trials=lc["eval_n_trials"], n_batches=lc["eval_n_batches"],
-                              seed=seed + lc["eval_seed_offset"], prefix=lc["eval_batch_prefix"])
+    eval_df = simulate_trials(
+        cfg,
+        n_trials=lc["eval_n_trials"],
+        n_batches=lc["eval_n_batches"],
+        seed=seed + lc["eval_seed_offset"],
+        prefix=lc["eval_batch_prefix"],
+    )
     specs = {}
     for label in lc["models"]:
         name = best if label == "best" else label
@@ -105,23 +120,36 @@ def _learning_curve(cfg: Config, pool: pd.DataFrame, best: str, best_params: dic
 
 def _modal_params(cv_folds: pd.DataFrame, name: str) -> dict:
     """Most frequently selected hyperparameters across outer folds."""
-    picks = cv_folds.loc[cv_folds["model"] == name, "params"].map(lambda p: json.dumps(p, sort_keys=True))
+    picks = cv_folds.loc[cv_folds["model"] == name, "params"].map(
+        lambda p: json.dumps(p, sort_keys=True)
+    )
     return json.loads(picks.mode().iloc[0]) if len(picks) else {}
 
 
-def _figures(cfg: Config, summary: pd.DataFrame, bundle: ModelBundle, test_df: pd.DataFrame,
-             curve: pd.DataFrame) -> None:
+def _figures(
+    cfg: Config,
+    summary: pd.DataFrame,
+    bundle: ModelBundle,
+    test_df: pd.DataFrame,
+    curve: pd.DataFrame,
+) -> None:
     fig_dir = resolve_path(cfg, "figures_dir")
     y = test_df[cfg["features"]["target"]].to_numpy()
     frame = bundle.predict_frame(test_df)
     pred = frame["predicted_recovery"].to_numpy()
     pct = int(round(100 * (1 - cfg["uncertainty"]["alpha"])))
     plots.model_comparison(summary, fig_dir / "model_comparison.png")
-    plots.predicted_vs_actual(y, pred, frame["lower"].to_numpy(), frame["upper"].to_numpy(),
-                              f"Held-out batches: {bundle.model_name} ({pct}% intervals)",
-                              fig_dir / "pred_vs_actual.png")
-    plots.residuals(y, pred, f"Residuals on held-out batches: {bundle.model_name}",
-                    fig_dir / "residuals.png")
+    plots.predicted_vs_actual(
+        y,
+        pred,
+        frame["lower"].to_numpy(),
+        frame["upper"].to_numpy(),
+        f"Held-out batches: {bundle.model_name} ({pct}% intervals)",
+        fig_dir / "pred_vs_actual.png",
+    )
+    plots.residuals(
+        y, pred, f"Residuals on held-out batches: {bundle.model_name}", fig_dir / "residuals.png"
+    )
     plots.learning_curve(curve, fig_dir / "learning_curve.png")
 
 
@@ -135,8 +163,13 @@ def run_training(cfg: Config) -> dict:
     tr, te = holdout_split(groups, cfg["model"]["test_batch_fraction"], seed)
     train_df, test_df = df.iloc[tr].reset_index(drop=True), df.iloc[te].reset_index(drop=True)
     gcol = cfg["features"]["group"]
-    logger.info("train: %d rows / %d batches; test: %d rows / %d batches", len(train_df),
-                train_df[gcol].nunique(), len(test_df), test_df[gcol].nunique())
+    logger.info(
+        "train: %d rows / %d batches; test: %d rows / %d batches",
+        len(train_df),
+        train_df[gcol].nunique(),
+        len(test_df),
+        test_df[gcol].nunique(),
+    )
 
     folds, summary = compare_models(cfg, *_xyg(train_df, cfg), seed)
     best = select_best(summary, cfg["model"]["selection_metric"])
@@ -151,10 +184,16 @@ def run_training(cfg: Config) -> dict:
         "created_utc": datetime.now(UTC).isoformat(timespec="seconds"),
         "git": git_info(Path(cfg["_root"])),
         "seed": seed,
-        "data": {"path": cfg["paths"]["data"], "sha256": file_sha256(data_path), "n_rows": len(df),
-                 "n_batches": int(df[gcol].nunique())},
-        "split": {"train_batches": sorted(train_df[gcol].unique()),
-                  "test_batches": sorted(test_df[gcol].unique())},
+        "data": {
+            "path": cfg["paths"]["data"],
+            "sha256": file_sha256(data_path),
+            "n_rows": len(df),
+            "n_batches": int(df[gcol].nunique()),
+        },
+        "split": {
+            "train_batches": sorted(train_df[gcol].unique()),
+            "test_batches": sorted(test_df[gcol].unique()),
+        },
         "cv_summary": summary.round(5).to_dict(orient="index"),
         "selected_model": best,
         "selected_params": best_params,
@@ -163,7 +202,9 @@ def run_training(cfg: Config) -> dict:
         "learning_curve": curve.round(5).to_dict(orient="records"),
         "config": {k: v for k, v in cfg.items() if not k.startswith("_")},
     }
-    bundle.metadata = {k: metrics[k] for k in ("created_utc", "git", "seed", "data", "selected_model")}
+    bundle.metadata = {
+        k: metrics[k] for k in ("created_utc", "git", "seed", "data", "selected_model")
+    }
     bundle.save(resolve_path(cfg, "model"))
     _write_outputs(cfg, metrics, folds, curve)
     return metrics
@@ -173,6 +214,8 @@ def _write_outputs(cfg: Config, metrics: dict, folds: pd.DataFrame, curve: pd.Da
     out = resolve_path(cfg, "metrics")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(metrics, indent=2, default=str))
-    folds.assign(params=folds["params"].map(json.dumps)).to_csv(resolve_path(cfg, "cv_results"), index=False)
+    folds.assign(params=folds["params"].map(json.dumps)).to_csv(
+        resolve_path(cfg, "cv_results"), index=False
+    )
     curve.to_csv(resolve_path(cfg, "learning_curve"), index=False)
     logger.info("wrote %s", out)

@@ -41,7 +41,12 @@ def conformal_quantile(abs_residuals: np.ndarray, alpha: float) -> float:
 
 
 def oof_predictions(
-    estimator: BaseEstimator, X: pd.DataFrame, y: np.ndarray, groups: np.ndarray, n_splits: int, seed: int
+    estimator: BaseEstimator,
+    X: pd.DataFrame,
+    y: np.ndarray,
+    groups: np.ndarray,
+    n_splits: int,
+    seed: int,
 ) -> np.ndarray:
     """Out-of-fold predictions where each fold holds out whole batches."""
     pred = np.empty(len(y))

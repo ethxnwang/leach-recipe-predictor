@@ -88,7 +88,12 @@ def correlation_heatmap(df: pd.DataFrame, columns: Sequence[str], path: Path) ->
 
 
 def recovery_vs_features(
-    df: pd.DataFrame, columns: Sequence[str], target: str, hue: str, levels: Sequence[str], path: Path
+    df: pd.DataFrame,
+    columns: Sequence[str],
+    target: str,
+    hue: str,
+    levels: Sequence[str],
+    path: Path,
 ) -> Path:
     colors = color_map(levels)
     n_cols = 4
@@ -111,8 +116,14 @@ def model_comparison(summary: pd.DataFrame, path: Path) -> Path:
     """Horizontal bars of outer-CV RMSE (mean +/- sd across folds)."""
     s = summary.sort_values("rmse_mean", ascending=False)
     fig, ax = plt.subplots(figsize=(7, 0.55 * len(s) + 1.2))
-    ax.barh(s.index, s["rmse_mean"], xerr=s["rmse_std"], color=SERIES[0], height=0.55,
-            error_kw={"ecolor": TEXT_SECONDARY, "elinewidth": 1, "capsize": 3})
+    ax.barh(
+        s.index,
+        s["rmse_mean"],
+        xerr=s["rmse_std"],
+        color=SERIES[0],
+        height=0.55,
+        error_kw={"ecolor": TEXT_SECONDARY, "elinewidth": 1, "capsize": 3},
+    )
     for y, v in enumerate(s["rmse_mean"]):
         ax.text(v, y, f"  {v:.3f}", va="center", ha="left", fontsize=8, color=TEXT_PRIMARY)
     ax.set_xlabel("RMSE, nested GroupKFold by batch (lower is better)")
@@ -149,8 +160,14 @@ def learning_curve(curve: pd.DataFrame, path: Path) -> Path:
     for i, (model, sub) in enumerate(curve.groupby("model", sort=False)):
         sub = sub.sort_values("n_trials")
         c = SERIES[i]
-        ax.fill_between(sub["n_trials"], sub["rmse_mean"] - sub["rmse_std"],
-                        sub["rmse_mean"] + sub["rmse_std"], color=c, alpha=0.15, linewidth=0)
+        ax.fill_between(
+            sub["n_trials"],
+            sub["rmse_mean"] - sub["rmse_std"],
+            sub["rmse_mean"] + sub["rmse_std"],
+            color=c,
+            alpha=0.15,
+            linewidth=0,
+        )
         ax.plot(sub["n_trials"], sub["rmse_mean"], color=c, marker="o", markersize=5, label=model)
     ax.set(xlabel="number of training trials", ylabel="RMSE on fresh simulated batches")
     ax.set_xticks(sorted(curve["n_trials"].unique()))
@@ -159,9 +176,7 @@ def learning_curve(curve: pd.DataFrame, path: Path) -> Path:
     return _save(fig, path)
 
 
-def cumulative_success(
-    curves: Mapping[float, pd.DataFrame], budget: int, path: Path
-) -> Path:
+def cumulative_success(curves: Mapping[float, pd.DataFrame], budget: int, path: Path) -> Path:
     """Fraction of runs that reached each target by trial n, one panel per target."""
     fig, axes = plt.subplots(1, len(curves), figsize=(4.2 * len(curves), 3.8), sharey=True)
     axes = np.atleast_1d(axes)

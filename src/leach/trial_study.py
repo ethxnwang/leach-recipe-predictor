@@ -33,6 +33,7 @@ from leach.simulate import LabSimulator, sample_batches
 
 logger = logging.getLogger(__name__)
 
+DISCLAIMER = "Synthetic data; demonstrates the methodology only; unrelated to any proprietary work."
 STRATEGIES = ("random", "manual_greedy", "model_top_k", "model_seeded_greedy")
 
 
@@ -52,8 +53,14 @@ def run_sequence(lab: LabSimulator, recipes: Sequence[Mapping], budget: int) -> 
 
 
 def run_greedy(
-    lab: LabSimulator, budget: int, lo, hi, cols: list[str], start: np.ndarray,
-    step_fraction: float, min_step_fraction: float,
+    lab: LabSimulator,
+    budget: int,
+    lo,
+    hi,
+    cols: list[str],
+    start: np.ndarray,
+    step_fraction: float,
+    min_step_fraction: float,
 ) -> None:
     """One-factor-at-a-time hill climb on noisy measurements."""
     x = np.clip(np.asarray(start, float), lo, hi)
@@ -79,12 +86,21 @@ def run_greedy(
 
 def oracle_max(lab: LabSimulator, lo, hi, cols: list[str], de_cfg: Mapping, seed: int) -> float:
     """Best achievable noise-free recovery for this batch within the bounds."""
+
     def neg_truth(x):
         return -lab.truth(pd.DataFrame(np.atleast_2d(x.T), columns=cols))
 
-    res = differential_evolution(neg_truth, list(zip(lo, hi, strict=True)), vectorized=True,
-                                 updating="deferred", polish=False, seed=seed,
-                                 maxiter=de_cfg["maxiter"], popsize=de_cfg["popsize"], tol=de_cfg["tol"])
+    res = differential_evolution(
+        neg_truth,
+        list(zip(lo, hi, strict=True)),
+        vectorized=True,
+        updating="deferred",
+        polish=False,
+        seed=seed,
+        maxiter=de_cfg["maxiter"],
+        popsize=de_cfg["popsize"],
+        tol=de_cfg["tol"],
+    )
     return float(-res.fun)
 
 
@@ -93,7 +109,9 @@ def run_one(run_idx: int, bundle: ModelBundle, cfg: Config) -> list[dict]:
     ts = cfg["trial_study"]
     seed, budget = ts["seed"] + run_idx, ts["budget"]
     rng = np.random.default_rng(seed)
-    batch = sample_batches(1, rng, cfg["simulation"], f"{ts['batch_prefix']}{run_idx}-", ensure_all_types=False)[0]
+    batch = sample_batches(
+        1, rng, cfg["simulation"], f"{ts['batch_prefix']}{run_idx}-", ensure_all_types=False
+    )[0]
     cols = recipe_features(cfg)
     lo = np.array([bundle.recipe_bounds[c][0] for c in cols])
     hi = np.array([bundle.recipe_bounds[c][1] for c in cols])
@@ -101,27 +119,48 @@ def run_one(run_idx: int, bundle: ModelBundle, cfg: Config) -> list[dict]:
     rec = recommend(bundle, feed, cfg, cost_weight=ts["cost_weight"], top_k=budget, seed=seed)
     recipes = [r.recipe for r in rec.recommendations]
     top1 = rec.recommendations[0]
-    labs = {s: LabSimulator(batch, cfg, np.random.default_rng([seed, i])) for i, s in enumerate(STRATEGIES)}
+    labs = {
+        s: LabSimulator(batch, cfg, np.random.default_rng([seed, i]))
+        for i, s in enumerate(STRATEGIES)
+    }
 
     greedy = (ts["step_fraction"], ts["min_step_fraction"])
     run_random(labs["random"], budget, lo, hi, cols, np.random.default_rng([seed, 99]))
     run_greedy(labs["manual_greedy"], budget, lo, hi, cols, (lo + hi) / 2, *greedy)
     run_sequence(labs["model_top_k"], recipes, budget)
-    run_greedy(labs["model_seeded_greedy"], budget, lo, hi, cols, np.array([top1.recipe[c] for c in cols]), *greedy)
+    run_greedy(
+        labs["model_seeded_greedy"],
+        budget,
+        lo,
+        hi,
+        cols,
+        np.array([top1.recipe[c] for c in cols]),
+        *greedy,
+    )
 
     oracle = oracle_max(labs["random"], lo, hi, cols, ts["oracle_de"], seed)
     top1_truth = labs["model_top_k"].truth_history[0]
     rows = []
     for s, lab in labs.items():
         for target in ts["targets"]:
-            rows.append({
-                "run": run_idx, "batch_id": batch.batch_id, "feed_type": batch.feed_type,
-                "strategy": s, "target": target, "trials_to_target": trials_to_target(lab.truth_history, target),
-                "n_trials_run": len(lab.truth_history), "best_true_recovery": max(lab.truth_history),
-                "oracle_max": oracle, "achievable": oracle >= target,
-                "top1_predicted": top1.predicted_recovery, "top1_lower": top1.lower,
-                "top1_upper": top1.upper, "top1_true": top1_truth,
-            })
+            rows.append(
+                {
+                    "run": run_idx,
+                    "batch_id": batch.batch_id,
+                    "feed_type": batch.feed_type,
+                    "strategy": s,
+                    "target": target,
+                    "trials_to_target": trials_to_target(lab.truth_history, target),
+                    "n_trials_run": len(lab.truth_history),
+                    "best_true_recovery": max(lab.truth_history),
+                    "oracle_max": oracle,
+                    "achievable": oracle >= target,
+                    "top1_predicted": top1.predicted_recovery,
+                    "top1_lower": top1.lower,
+                    "top1_upper": top1.upper,
+                    "top1_true": top1_truth,
+                }
+            )
     return rows
 
 
@@ -141,12 +180,16 @@ def _censored(runs: pd.DataFrame, budget: int) -> pd.Series:
 def summarize(runs: pd.DataFrame, budget: int) -> pd.DataFrame:
     runs = runs.assign(censored=_censored(runs, budget), success=runs["trials_to_target"].notna())
     g = runs.groupby(["target", "strategy"], sort=False)
-    out = pd.DataFrame({
-        "success_rate": g["success"].mean(),
-        "success_rate_if_achievable": runs[runs["achievable"]].groupby(["target", "strategy"], sort=False)["success"].mean(),
-        "median_trials_censored": g["censored"].median(),
-        "mean_trials_if_success": g["trials_to_target"].mean(),
-    })
+    out = pd.DataFrame(
+        {
+            "success_rate": g["success"].mean(),
+            "success_rate_if_achievable": runs[runs["achievable"]]
+            .groupby(["target", "strategy"], sort=False)["success"]
+            .mean(),
+            "median_trials_censored": g["censored"].median(),
+            "mean_trials_if_success": g["trials_to_target"].mean(),
+        }
+    )
     return out.reset_index()
 
 
@@ -164,7 +207,10 @@ def cumulative_curves(runs: pd.DataFrame, budget: int) -> dict[float, pd.DataFra
     n = np.arange(1, budget + 1)
     for target, sub in runs.groupby("target"):
         curves[target] = pd.DataFrame(
-            {s: [(sub.loc[sub["strategy"] == s, "trials_to_target"] <= k).mean() for k in n] for s in STRATEGIES},
+            {
+                s: [(sub.loc[sub["strategy"] == s, "trials_to_target"] <= k).mean() for k in n]
+                for s in STRATEGIES
+            },
             index=n,
         )
     return curves
@@ -189,19 +235,29 @@ def _no_help_findings(summary: pd.DataFrame, runs: pd.DataFrame, budget: int) ->
     for target, row in piv.iterrows():
         best_model = min(row["model_top_k"], row["model_seeded_greedy"])
         if best_model >= row["manual_greedy"]:
-            out.append(f"target {target:.2f}: no model-guided strategy beat manual_greedy on median "
-                       f"trials ({best_model:.1f} vs {row['manual_greedy']:.1f}).")
-    by_type = runs.assign(success=runs["trials_to_target"].notna()).groupby(
-        ["target", "feed_type", "strategy"])["success"].mean().unstack("strategy")
+            out.append(
+                f"target {target:.2f}: no model-guided strategy beat manual_greedy on median "
+                f"trials ({best_model:.1f} vs {row['manual_greedy']:.1f})."
+            )
+    by_type = (
+        runs.assign(success=runs["trials_to_target"].notna())
+        .groupby(["target", "feed_type", "strategy"])["success"]
+        .mean()
+        .unstack("strategy")
+    )
     for (target, ft), row in by_type.iterrows():
         if max(row["model_top_k"], row["model_seeded_greedy"]) < row["manual_greedy"]:
-            out.append(f"target {target:.2f}, feed type {ft}: manual_greedy success rate "
-                       f"{row['manual_greedy']:.2f} exceeds both model strategies "
-                       f"({row['model_top_k']:.2f}, {row['model_seeded_greedy']:.2f}).")
+            out.append(
+                f"target {target:.2f}, feed type {ft}: manual_greedy success rate "
+                f"{row['manual_greedy']:.2f} exceeds both model strategies "
+                f"({row['model_top_k']:.2f}, {row['model_seeded_greedy']:.2f})."
+            )
     unachievable = runs.loc[~runs["achievable"]].groupby("target")["run"].nunique()
     for target, n in unachievable.items():
-        out.append(f"target {target:.2f}: {n} run(s) had a feed where the target is unreachable "
-                   "within the bounds (oracle); no strategy can succeed there.")
+        out.append(
+            f"target {target:.2f}: {n} run(s) had a feed where the target is unreachable "
+            "within the bounds (oracle); no strategy can succeed there."
+        )
     return out
 
 
@@ -210,17 +266,23 @@ def write_report(runs: pd.DataFrame, cfg: Config, figure: Path, path: Path) -> P
     budget = ts["budget"]
     summary = summarize(runs, budget)
     one = runs.drop_duplicates("run")
-    curse = (one["top1_predicted"] - one["top1_true"])
-    top1_cov = ((one["top1_true"] >= one["top1_lower"]) & (one["top1_true"] <= one["top1_upper"])).mean()
-    h2h = [head_to_head(runs, a, "manual_greedy", budget).assign(comparison=f"{a} vs manual_greedy")
-           for a in ("model_seeded_greedy", "model_top_k")]
+    curse = one["top1_predicted"] - one["top1_true"]
+    top1_cov = (
+        (one["top1_true"] >= one["top1_lower"]) & (one["top1_true"] <= one["top1_upper"])
+    ).mean()
+    h2h = [
+        head_to_head(runs, a, "manual_greedy", budget).assign(comparison=f"{a} vs manual_greedy")
+        for a in ("model_seeded_greedy", "model_top_k")
+    ]
     h2h_df = pd.concat(h2h)[["comparison", "target", "a_fewer", "tie", "a_more"]]
-    achievable = one[["oracle_max"]].assign(**{f">= {t:.2f}": one["oracle_max"] >= t for t in ts["targets"]})
+    achievable = one[["oracle_max"]].assign(
+        **{f">= {t:.2f}": one["oracle_max"] >= t for t in ts["targets"]}
+    )
     findings = _no_help_findings(summary, runs, budget)
     lines = [
         "# Trial-efficiency simulation study",
         "",
-        "> **Synthetic data; demonstrates the methodology only; unrelated to any proprietary work.**",
+        f"> **{DISCLAIMER}**",
         "> Generated by `leach trial-study` from the invented simulator; regenerate to update.",
         "",
         "## Setup",
@@ -252,11 +314,15 @@ def write_report(runs: pd.DataFrame, cfg: Config, figure: Path, path: Path) -> P
         f"runs (nominal {1 - cfg['uncertainty']['alpha']:.0%}).",
         f"- Achievable (oracle) recovery across runs: mean {one['oracle_max'].mean():.3f}, "
         f"min {one['oracle_max'].min():.3f}; share of runs where each target is reachable: "
-        + ", ".join(f"{c} {achievable[c].mean():.0%}" for c in achievable.columns[1:]) + ".",
+        + ", ".join(f"{c} {achievable[c].mean():.0%}" for c in achievable.columns[1:])
+        + ".",
         "",
         "## Where the model does not help",
         "",
-        *([f"- {f}" for f in findings] or ["- No case found in this study where manual_greedy beat both model strategies."]),
+        *(
+            [f"- {f}" for f in findings]
+            or ["- No case found in this study where manual_greedy beat both model strategies."]
+        ),
         "",
         f"![cumulative success](figures/{figure.name})",
         "",
@@ -269,7 +335,10 @@ def run_and_report(bundle: ModelBundle, cfg: Config) -> pd.DataFrame:
     runs = run_study(bundle, cfg)
     runs.to_csv(resolve_path(cfg, "trial_runs"), index=False)
     budget = cfg["trial_study"]["budget"]
-    fig = plots.cumulative_success(cumulative_curves(runs, budget), budget,
-                                   resolve_path(cfg, "figures_dir") / "trial_efficiency.png")
+    fig = plots.cumulative_success(
+        cumulative_curves(runs, budget),
+        budget,
+        resolve_path(cfg, "figures_dir") / "trial_efficiency.png",
+    )
     write_report(runs, cfg, fig, resolve_path(cfg, "trial_report"))
     return summarize(runs, budget)

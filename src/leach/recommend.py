@@ -92,8 +92,10 @@ def _bound_warnings(recipe: Mapping, bounds: Mapping, tol: float) -> list[str]:
         eps = tol * (hi - lo)
         side = "lower" if recipe[col] <= lo + eps else "upper" if recipe[col] >= hi - eps else None
         if side:
-            out.append(f"top recipe sits at the {side} search bound for {col}; the optimum may lie "
-                       "outside the range covered by training data")
+            out.append(
+                f"top recipe sits at the {side} search bound for {col}; the optimum may lie "
+                "outside the range covered by training data"
+            )
     return out
 
 
@@ -140,7 +142,9 @@ def recommend(
         seen_obj.append(obj)
         return -obj if x.ndim == 2 else -obj[0]
 
-    _search(objective, list(zip(lo, hi, strict=True)), rc["de"], cfg["seed"] if seed is None else seed)
+    _search(
+        objective, list(zip(lo, hi, strict=True)), rc["de"], cfg["seed"] if seed is None else seed
+    )
     X_all, obj_all = np.vstack(seen_X), np.concatenate(seen_obj)
     idx = select_diverse(X_all, obj_all, lo, hi, k, rc["diversity_min_distance"])
     frame = bundle.predict_frame(candidate_frame(feed, X_all[idx], cols))
@@ -161,8 +165,9 @@ def recommend(
         for i, row, cost in zip(idx, frame.itertuples(), costs, strict=True)
     ]
     feed_reasons = bundle.ood.feed_reasons(feed)
-    warnings = [f"feed is out of distribution: {r}; predictions are extrapolations"
-                for r in feed_reasons]
+    warnings = [
+        f"feed is out of distribution: {r}; predictions are extrapolations" for r in feed_reasons
+    ]
     if recs:
         warnings += _bound_warnings(recs[0].recipe, bundle.recipe_bounds, rc["bound_tolerance"])
     for msg in warnings:

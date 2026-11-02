@@ -64,7 +64,8 @@ def sample_batches(
     chosen = types[:n_fixed] + [str(t) for t in rng.choice(types, n_batches - n_fixed, p=probs)]
     rng.shuffle(chosen)
     feeds = {
-        name: rng.uniform(lo, hi, size=n_batches) for name, (lo, hi) in sim_cfg["feed_ranges"].items()
+        name: rng.uniform(lo, hi, size=n_batches)
+        for name, (lo, hi) in sim_cfg["feed_ranges"].items()
     }
     effects = rng.normal(0.0, sim_cfg["batch_effect_sd"], size=n_batches)
     width = len(str(n_batches))
@@ -112,10 +113,14 @@ def rate_constant(df: pd.DataFrame, kin: Mapping) -> np.ndarray:
     temp_k = temp_c + KELVIN_OFFSET
     t_ref_k = kin["temp_ref_C"] + KELVIN_OFFSET
     f_t = np.exp(kin["activation_K"] * (1.0 / t_ref_k - 1.0 / temp_k))
-    decomp = np.exp(-np.clip(temp_c - kin["oxidant_decomp_C"], 0.0, None) / kin["oxidant_decomp_scale_C"])
+    decomp = np.exp(
+        -np.clip(temp_c - kin["oxidant_decomp_C"], 0.0, None) / kin["oxidant_decomp_scale_C"]
+    )
     f_ox = 1.0 + kin["oxidant_gain"] * _col(df, "oxidant_molarity") * decomp
     orp = _col(df, "ORP_mV")
-    passivation = kin["orp_passivation_per_mV"] * np.clip(orp - kin["orp_passivation_mV"], 0.0, None)
+    passivation = kin["orp_passivation_per_mV"] * np.clip(
+        orp - kin["orp_passivation_mV"], 0.0, None
+    )
     f_orp = _sigmoid((orp - kin["orp_mid_mV"]) / kin["orp_scale_mV"]) * np.clip(
         1.0 - passivation, 0.0, None
     )
@@ -148,7 +153,10 @@ def allocate_trials(n_trials: int, n_batches: int, rng: np.random.Generator) -> 
 
 def _batch_frame(batches: list[Batch], group_col: str) -> pd.DataFrame:
     return pd.DataFrame(
-        [{group_col: b.batch_id, "feed_type": b.feed_type, **b.feed, "_effect": b.effect} for b in batches]
+        [
+            {group_col: b.batch_id, "feed_type": b.feed_type, **b.feed, "_effect": b.effect}
+            for b in batches
+        ]
     )
 
 
