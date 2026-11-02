@@ -1,0 +1,18 @@
+{
+  "metrics": {
+    "rmse": 0.1340581297461423,
+    "mae": 0.10020285941557197,
+    "r2": 0.67884384080605,
+    "bias": -0.0012239072771315182,
+    "n": 40
+  },
+  "in_distribution_metrics": null,
+  "interval": {
+    "coverage": 0.925,
+    "mean_width": 0.39947984348104687
+  },
+  "nominal_coverage": 0.9,
+  "n_rows": 40,
+  "n_ood_rows": 0,
+  "model_name": "gradient_boosting"
+}
