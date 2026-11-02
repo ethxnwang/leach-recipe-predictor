@@ -32,8 +32,14 @@ from leach.uncertainty import coverage, fit_batch_bootstrap, fit_group_conformal
 logger = logging.getLogger(__name__)
 
 
+CODE_PATHS = ("src", "app", "config.yaml", "pyproject.toml")  # generated outputs excluded
+
+
 def git_info(root: Path) -> dict:
-    """Current commit and whether tracked files differ from it ("unknown" outside git)."""
+    """Current commit and whether tracked code/config differs from it ("unknown" outside git).
+
+    Generated artifacts (data/, reports/) are ignored, since a pipeline run rewrites them.
+    """
 
     def run(*args: str) -> str:
         return subprocess.run(
@@ -43,7 +49,7 @@ def git_info(root: Path) -> dict:
     try:
         return {
             "commit": run("rev-parse", "HEAD"),
-            "dirty": bool(run("status", "--porcelain", "-uno")),
+            "dirty": bool(run("status", "--porcelain", "-uno", "--", *CODE_PATHS)),
         }
     except (subprocess.CalledProcessError, FileNotFoundError):
         return {"commit": "unknown", "dirty": None}
