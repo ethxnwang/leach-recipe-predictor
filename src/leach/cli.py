@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import json
 import logging
+import warnings
 from pathlib import Path
 
 import pandas as pd
 import typer
+from sklearn.exceptions import ConvergenceWarning
 
 from leach.config import Config, load_config, resolve_path, setup_logging
+
+# A GP length-scale reaching its upper bound just means that input was judged irrelevant.
+warnings.filterwarnings("ignore", category=ConvergenceWarning, module="sklearn.gaussian_process")
 
 app = typer.Typer(
     help="Leaching recipe predictor (synthetic-data methodology demo).", no_args_is_help=True

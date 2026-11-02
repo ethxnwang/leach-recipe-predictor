@@ -1,18 +1,18 @@
 {
   "metrics": {
-    "rmse": 0.1340581297461423,
-    "mae": 0.10020285941557197,
-    "r2": 0.67884384080605,
-    "bias": -0.0012239072771315182,
+    "rmse": 0.0889425463164729,
+    "mae": 0.06440553881849677,
+    "r2": 0.8586326685004462,
+    "bias": -0.002882943505602982,
     "n": 40
   },
   "in_distribution_metrics": null,
   "interval": {
     "coverage": 0.925,
-    "mean_width": 0.39947984348104687
+    "mean_width": 0.3146475635059306
   },
   "nominal_coverage": 0.9,
   "n_rows": 40,
   "n_ood_rows": 0,
-  "model_name": "gradient_boosting"
+  "model_name": "gp_ensemble"
 }

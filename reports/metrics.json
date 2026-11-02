@@ -1,8 +1,8 @@
 {
-  "created_utc": "2026-11-02T07:06:05+00:00",
+  "created_utc": "2026-11-02T07:16:29+00:00",
   "git": {
-    "commit": "9d983f142268a37bcf2690b5732662b1a45eb886",
-    "dirty": false
+    "commit": "ba543fa1509c94d66362a86ffa1d2f102cd0f579",
+    "dirty": true
   },
   "seed": 42,
   "data": {
@@ -69,37 +69,67 @@
       "mae_std": 0.01881,
       "r2_mean": 0.60223,
       "r2_std": 0.0964
+    },
+    "gradient_boosting_fe": {
+      "rmse_mean": 0.10972,
+      "rmse_std": 0.02958,
+      "mae_mean": 0.08119,
+      "mae_std": 0.02064,
+      "r2_mean": 0.68829,
+      "r2_std": 0.12649
+    },
+    "gaussian_process": {
+      "rmse_mean": 0.09996,
+      "rmse_std": 0.0426,
+      "mae_mean": 0.0737,
+      "mae_std": 0.02983,
+      "r2_mean": 0.70566,
+      "r2_std": 0.2594
+    },
+    "gp_ensemble": {
+      "rmse_mean": 0.09683,
+      "rmse_std": 0.04149,
+      "mae_mean": 0.07202,
+      "mae_std": 0.02774,
+      "r2_mean": 0.72571,
+      "r2_std": 0.22914
     }
   },
-  "selected_model": "gradient_boosting",
-  "selected_params": {
-    "learning_rate": 0.03,
-    "max_depth": 2,
-    "n_estimators": 400
-  },
+  "selected_model": "gp_ensemble",
+  "selected_params": {},
   "holdout": {
     "metrics": {
-      "rmse": 0.16174756025155737,
-      "mae": 0.1176144769972997,
-      "r2": 0.5404212055955544,
-      "bias": -0.06101816860663784,
+      "rmse": 0.11979157456096533,
+      "mae": 0.07868414141440222,
+      "r2": 0.7479207772644284,
+      "bias": -0.05502058044526275,
       "n": 36
     },
     "conformal_interval": {
-      "coverage": 0.8611111111111112,
-      "mean_width": 0.39643674911650356
+      "coverage": 0.8333333333333334,
+      "mean_width": 0.31469191547442316
     },
     "bootstrap_interval": {
-      "coverage": 0.5,
-      "mean_width": 0.14953393656428368
+      "coverage": 0.5833333333333334,
+      "mean_width": 0.1818421007535277
     },
     "nominal_coverage": 0.9,
     "n_ood_rows": 0
   },
-  "conformal_half_width": 0.21666759918323558,
+  "conformal_half_width": 0.1714187493144187,
   "learning_curve": [
     {
-      "model": "gradient_boosting (selected)",
+      "model": "gp_ensemble (selected)",
+      "n_trials": 30,
+      "rmse_mean": 0.18479,
+      "rmse_std": 0.01771,
+      "mae_mean": 0.14075,
+      "mae_std": 0.01344,
+      "r2_mean": 0.2483,
+      "r2_std": 0.14338
+    },
+    {
+      "model": "gradient_boosting",
       "n_trials": 30,
       "rmse_mean": 0.17581,
       "rmse_std": 0.01148,
@@ -129,7 +159,17 @@
       "r2_std": 0.07287
     },
     {
-      "model": "gradient_boosting (selected)",
+      "model": "gp_ensemble (selected)",
+      "n_trials": 60,
+      "rmse_mean": 0.11393,
+      "rmse_std": 0.01063,
+      "mae_mean": 0.0855,
+      "mae_std": 0.00713,
+      "r2_mean": 0.71437,
+      "r2_std": 0.05402
+    },
+    {
+      "model": "gradient_boosting",
       "n_trials": 60,
       "rmse_mean": 0.15385,
       "rmse_std": 0.00698,
@@ -159,7 +199,17 @@
       "r2_std": 0.02698
     },
     {
-      "model": "gradient_boosting (selected)",
+      "model": "gp_ensemble (selected)",
+      "n_trials": 90,
+      "rmse_mean": 0.10024,
+      "rmse_std": 0.01198,
+      "mae_mean": 0.07552,
+      "mae_std": 0.00787,
+      "r2_mean": 0.7778,
+      "r2_std": 0.05504
+    },
+    {
+      "model": "gradient_boosting",
       "n_trials": 90,
       "rmse_mean": 0.1442,
       "rmse_std": 0.00625,
@@ -189,7 +239,17 @@
       "r2_std": 0.0233
     },
     {
-      "model": "gradient_boosting (selected)",
+      "model": "gp_ensemble (selected)",
+      "n_trials": 120,
+      "rmse_mean": 0.0914,
+      "rmse_std": 0.00379,
+      "mae_mean": 0.06878,
+      "mae_std": 0.00301,
+      "r2_mean": 0.81732,
+      "r2_std": 0.01535
+    },
+    {
+      "model": "gradient_boosting",
       "n_trials": 120,
       "rmse_mean": 0.13388,
       "rmse_std": 0.00437,
@@ -219,7 +279,17 @@
       "r2_std": 0.00825
     },
     {
-      "model": "gradient_boosting (selected)",
+      "model": "gp_ensemble (selected)",
+      "n_trials": 150,
+      "rmse_mean": 0.07524,
+      "rmse_std": 0.0,
+      "mae_mean": 0.0559,
+      "mae_std": 0.0,
+      "r2_mean": 0.8764,
+      "r2_std": 0.0
+    },
+    {
+      "model": "gradient_boosting",
       "n_trials": 150,
       "rmse_mean": 0.12803,
       "rmse_std": 0.0015,
@@ -518,8 +588,69 @@
               0.1
             ]
           }
+        },
+        "gradient_boosting_fe": {
+          "estimator": "gradient_boosting",
+          "engineered_features": true,
+          "target_transform": "logit",
+          "params": {
+            "subsample": 0.8
+          },
+          "grid": {
+            "n_estimators": [
+              150,
+              400
+            ],
+            "max_depth": [
+              2,
+              3
+            ],
+            "learning_rate": [
+              0.03,
+              0.1
+            ]
+          }
+        },
+        "gaussian_process": {
+          "estimator": "gaussian_process",
+          "engineered_features": true,
+          "target_transform": "logit",
+          "gp": {
+            "kernel": "ard",
+            "nu": 2.5,
+            "noise_init": 0.1,
+            "n_restarts": 2
+          }
+        },
+        "gp_ensemble": {
+          "estimator": "voting",
+          "members": {
+            "ard": {
+              "estimator": "gaussian_process",
+              "engineered_features": true,
+              "target_transform": "logit",
+              "gp": {
+                "kernel": "ard",
+                "nu": 2.5,
+                "noise_init": 0.1,
+                "n_restarts": 2
+              }
+            },
+            "isotropic": {
+              "estimator": "gaussian_process",
+              "engineered_features": true,
+              "target_transform": "logit",
+              "gp": {
+                "kernel": "isotropic",
+                "nu": 2.5,
+                "noise_init": 0.1,
+                "n_restarts": 2
+              }
+            }
+          }
         }
       },
+      "logit_eps": 0.001,
       "learning_curve": {
         "sizes": [
           30,
@@ -531,6 +662,7 @@
         "repeats": 10,
         "models": [
           "best",
+          "gradient_boosting",
           "ridge",
           "mean"
         ],
@@ -538,6 +670,24 @@
         "eval_n_trials": 400,
         "eval_seed_offset": 1000,
         "eval_batch_prefix": "LC"
+      }
+    },
+    "feature_engineering": {
+      "log": [
+        "time_min",
+        "particle_size_um",
+        "reagent_molarity"
+      ],
+      "inverse_kelvin": [
+        "temperature_C"
+      ],
+      "square": [
+        "pH"
+      ],
+      "interact_with_category": {
+        "feed_type": [
+          "pH"
+        ]
       }
     },
     "uncertainty": {
