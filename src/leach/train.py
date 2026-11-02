@@ -113,6 +113,8 @@ def _learning_curve(
     specs = {}
     for label in lc["models"]:
         name = best if label == "best" else label
+        if label != "best" and name == best:
+            continue  # already included as the selected model
         params = best_params if name == best else _modal_params(cv_folds, name)
         specs[f"{name} (selected)" if label == "best" else name] = (name, params)
     return learning_curve_study(cfg, pool, eval_df, specs, seed)

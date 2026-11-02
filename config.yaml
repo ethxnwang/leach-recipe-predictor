@@ -116,14 +116,46 @@ model:
       estimator: gradient_boosting
       params: { subsample: 0.8 }
       grid: { n_estimators: [150, 400], max_depth: [2, 3], learning_rate: [0.03, 0.1] }
+    gradient_boosting_fe: # same model with engineered features + logit target (isolates their effect)
+      estimator: gradient_boosting
+      engineered_features: true
+      target_transform: logit
+      params: { subsample: 0.8 }
+      grid: { n_estimators: [150, 400], max_depth: [2, 3], learning_rate: [0.03, 0.1] }
+    gaussian_process: # hyperparameters fitted by marginal likelihood, so no grid
+      estimator: gaussian_process
+      engineered_features: true
+      target_transform: logit
+      gp: { kernel: ard, nu: 2.5, noise_init: 0.1, n_restarts: 2 }
+    gp_ensemble: # average of a per-input-scale GP and a single-scale GP (steadier with few trials)
+      estimator: voting
+      members:
+        ard:
+          estimator: gaussian_process
+          engineered_features: true
+          target_transform: logit
+          gp: { kernel: ard, nu: 2.5, noise_init: 0.1, n_restarts: 2 }
+        isotropic:
+          estimator: gaussian_process
+          engineered_features: true
+          target_transform: logit
+          gp: { kernel: isotropic, nu: 2.5, noise_init: 0.1, n_restarts: 2 }
+  logit_eps: 0.001 # clip recovery to [eps, 1-eps] before the logit transform
   learning_curve:
     sizes: [30, 60, 90, 120, 150]
     repeats: 10
-    models: [best, ridge, mean] # "best" = the selected model
+    models: [best, gradient_boosting, ridge, mean] # "best" = the selected model
     eval_n_batches: 20 # fresh, never-seen batches simulated only for evaluation
     eval_n_trials: 400
     eval_seed_offset: 1000
     eval_batch_prefix: LC
+
+# Generic engineered features (used by candidates with engineered_features: true)
+feature_engineering:
+  log: [time_min, particle_size_um, reagent_molarity] # log1p
+  inverse_kelvin: [temperature_C] # 1 / (T + 273.15), Arrhenius-style
+  square: [pH] # lets linear-in-features models express an optimum
+  interact_with_category: { feed_type: [pH] } # optimum may differ by feed type
 
 uncertainty:
   alpha: 0.10 # 90% nominal intervals

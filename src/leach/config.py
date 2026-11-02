@@ -16,6 +16,7 @@ REQUIRED_SECTIONS = (
     "logging",
     "paths",
     "features",
+    "feature_engineering",
     "schema",
     "simulation",
     "model",
