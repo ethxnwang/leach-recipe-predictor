@@ -63,11 +63,11 @@ make setup      # venv + pip install -e ".[dev,app]"
 ```
 
 ```bash
-make pipeline   # simulate -> lab-data -> eda -> train -> evaluate -> trial-study (~45 s)
+make pipeline   # simulate -> lab-data -> eda -> train -> evaluate -> trial-study (~2 min)
 ```
 
 ```bash
-make test       # pytest (58 tests)
+make test       # pytest (67 tests)
 ```
 
 ```bash
@@ -86,7 +86,7 @@ Individual steps (`leach --help` lists every option):
 | `leach trial-study` | write `reports/trial_efficiency.md` |
 | `make serve` / `make app` | FastAPI on :8000 / Streamlit demo |
 
-All tunable constants (simulator, CV folds, grids, interval level, cost weights, study budget)
+All tunable constants (simulator, features, CV folds, grids, interval level, cost weights, study budget)
 live in [`config.yaml`](config.yaml).
 
 ### Scoring your own lab data
@@ -110,7 +110,7 @@ curl -s -X POST localhost:8000/predict -H 'Content-Type: application/json' -d '{
 ```
 
 ```json
-{"model_name":"gradient_boosting","nominal_coverage":0.9,"predictions":[{"predicted_recovery":0.6118,"lower":0.3951,"upper":0.8285,"model_spread_std":0.0448,"is_ood":false,"ood_reasons":""}]}
+{"model_name":"gp_ensemble","nominal_coverage":0.9,"predictions":[{"predicted_recovery":0.749,"lower":0.5776,"upper":0.9205,"model_spread_std":0.1169,"is_ood":false,"ood_reasons":""}]}
 ```
 
 ```bash
@@ -135,7 +135,13 @@ Interactive docs are at `http://localhost:8000/docs`.
   rows from batches the model has already seen. All models share the same outer folds. Tests
   check that no batch appears on both sides of any split.
 - **Models.** Each model is a `ColumnTransformer` (one-hot `feed_type`, standardised numerics)
-  followed by an estimator, wrapped so predictions are clipped to [0, 1].
+  followed by an estimator, wrapped so predictions are clipped to [0, 1]. Candidates can
+  optionally add generic engineered features (`log1p` of time, particle size and reagent;
+  1/(T + 273.15); pH²; pH × feed type) and fit on logit(recovery), which respects the bounded
+  target. Gaussian-process candidates use a Matern 5/2 kernel plus a white-noise term, with
+  hyperparameters fitted by marginal likelihood. The selected **GP ensemble** averages a GP
+  with one length-scale per input (ARD) and a GP with a single shared length-scale; the
+  second is steadier when data is scarce.
 - **Uncertainty.** (a) *Grouped-CV conformal*: the interval half-width is the finite-sample
   conformal quantile of out-of-fold absolute residuals, with batches as folds. (b) *Batch
   bootstrap*: 30 refits on resampled batches. Its spread measures model disagreement only and
@@ -155,65 +161,84 @@ These are the actual outputs of `make pipeline` at the commit recorded in
 
 ### Model comparison: nested GroupKFold on the 9 training batches (mean ± sd over 5 outer folds)
 
-| Model | RMSE | MAE | R² |
-|---|---|---|---|
-| mean (baseline) | 0.212 ± 0.028 | 0.182 ± 0.023 | −0.14 ± 0.14 |
-| ridge (baseline) | 0.142 ± 0.036 | 0.114 ± 0.033 | 0.48 ± 0.21 |
-| elasticnet | 0.142 ± 0.036 | 0.113 ± 0.033 | 0.48 ± 0.22 |
-| random forest | 0.141 ± 0.030 | 0.112 ± 0.021 | 0.50 ± 0.16 |
-| **gradient boosting (selected)** | **0.125 ± 0.020** | **0.098 ± 0.019** | **0.60 ± 0.10** |
+| Model | Features | RMSE | MAE | R² |
+|---|---|---|---|---|
+| mean (baseline) | raw | 0.212 ± 0.028 | 0.182 ± 0.023 | −0.14 ± 0.14 |
+| ridge (baseline) | raw | 0.142 ± 0.036 | 0.114 ± 0.033 | 0.48 ± 0.21 |
+| elasticnet | raw | 0.142 ± 0.036 | 0.113 ± 0.033 | 0.48 ± 0.22 |
+| random forest | raw | 0.141 ± 0.030 | 0.112 ± 0.021 | 0.50 ± 0.15 |
+| gradient boosting | raw | 0.125 ± 0.020 | 0.098 ± 0.019 | 0.60 ± 0.10 |
+| gradient boosting | engineered + logit | 0.110 ± 0.030 | 0.081 ± 0.021 | 0.69 ± 0.13 |
+| Gaussian process (ARD) | engineered + logit | 0.100 ± 0.043 | 0.074 ± 0.030 | 0.71 ± 0.26 |
+| **GP ensemble (selected)** | engineered + logit | **0.097 ± 0.041** | **0.072 ± 0.028** | **0.73 ± 0.23** |
 
-Selected hyperparameters: `learning_rate=0.03, max_depth=2, n_estimators=400`.
+The gradient-boosting rows separate the two changes. Engineered features plus the logit
+target take RMSE from 0.125 to 0.110, and switching to a GP takes it to 0.097. The GPs vary
+more from fold to fold than gradient boosting does: they are better on average but less
+consistent.
 
 ### Final evaluation
 
 | Evaluation set | n | RMSE | MAE | R² | Bias | 90% interval coverage | Mean width |
 |---|---|---|---|---|---|---|---|
-| Held-out test batches (B01, B10, B11) | 36 | 0.162 | 0.118 | 0.54 | −0.061 | 0.86 (conformal) | 0.40 |
-| Same, bootstrap percentile interval | 36 | – | – | – | – | 0.50 | 0.15 |
-| Example "lab" CSV (4 new batches) | 40 | 0.134 | 0.100 | 0.68 | −0.001 | 0.93 (conformal) | 0.40 |
+| Held-out test batches (B01, B10, B11) | 36 | 0.120 | 0.079 | 0.75 | −0.055 | 0.83 (conformal) | 0.31 |
+| Same, bootstrap percentile interval | 36 | – | – | – | – | 0.58 | 0.18 |
+| Example "lab" CSV (4 new batches) | 40 | 0.089 | 0.064 | 0.86 | −0.003 | 0.93 (conformal) | 0.31 |
+
+The earlier gradient-boosting version of this pipeline scored a held-out RMSE of 0.162 (R² 0.54) and an
+example-lab RMSE of 0.134 (R² 0.68). The held-out batches were not used for any model or
+feature choice; those decisions used only CV on the training batches and freshly simulated
+batches.
 
 ### Learning curve (RMSE on 400 trials from 20 fresh simulated batches; mean over 10 resamples)
 
 | Trials | 30 | 60 | 90 | 120 | 150 |
 |---|---|---|---|---|---|
-| gradient boosting | 0.176 | 0.154 | 0.144 | 0.134 | 0.128 |
+| **GP ensemble (selected)** | 0.185 | **0.114** | **0.100** | **0.091** | **0.075** |
+| gradient boosting (previous model) | **0.176** | 0.154 | 0.144 | 0.134 | 0.128 |
 | ridge | 0.180 | 0.160 | 0.159 | 0.156 | 0.154 |
 | mean | 0.222 | 0.217 | 0.217 | 0.215 | 0.216 |
 
-Because these are simulations, the learning curve is evaluated on freshly generated batches,
-which you could not do with real data.
+From 60 trials onward the GP ensemble's error is 26–41% lower than gradient boosting's. At
+30 trials it is slightly *worse* (0.185 vs 0.176, and more variable), because 30 points are
+too few to fit its kernel hyperparameters reliably. Its curve is still falling at 150, so
+more trials would keep helping. Because these are simulations, the learning curve is
+evaluated on freshly generated batches, which you could not do with real data.
 
 ### Trial-efficiency study (100 new feed batches, 15-trial budget)
 
 Full report: [`reports/trial_efficiency.md`](reports/trial_efficiency.md).
 
-| Target | Strategy | Success rate | Success rate, if reachable | Mean trials (successes) |
-|---|---|---|---|---|
-| ≥ 0.70 | random | 0.50 | 0.57 | 7.3 |
-| ≥ 0.70 | manual greedy | 0.80 | 0.91 | 4.6 |
-| ≥ 0.70 | model top-k | 0.83 | 0.94 | 3.2 |
-| ≥ 0.70 | model-seeded greedy | 0.83 | 0.94 | 4.3 |
-| ≥ 0.80 | manual greedy | 0.45 | 0.73 | 8.3 |
-| ≥ 0.80 | model top-k | 0.40 | 0.65 | 4.9 |
-| ≥ 0.80 | model-seeded greedy | 0.49 | 0.79 | 6.9 |
-| ≥ 0.90 | manual greedy | 0.08 | 0.40 | 9.8 |
-| ≥ 0.90 | model top-k | 0.02 | 0.10 | 6.5 |
-| ≥ 0.90 | model-seeded greedy | 0.09 | 0.45 | 7.8 |
+| Target | Strategy | Success rate | Success rate, if reachable | Median trials* | Mean trials (successes) |
+|---|---|---|---|---|---|
+| ≥ 0.70 | random | 0.50 | 0.57 | 15.5 | 7.3 |
+| ≥ 0.70 | manual greedy | 0.80 | 0.91 | 6 | 4.6 |
+| ≥ 0.70 | model top-k | 0.88 | 1.00 | 1 | 1.0 |
+| ≥ 0.70 | model-seeded greedy | 0.88 | 1.00 | 1 | 1.0 |
+| ≥ 0.80 | manual greedy | 0.45 | 0.73 | >15 | 8.3 |
+| ≥ 0.80 | model top-k | 0.58 | 0.94 | 3.5 | 2.2 |
+| ≥ 0.80 | model-seeded greedy | 0.53 | 0.85 | 2 | 1.5 |
+| ≥ 0.90 | manual greedy | 0.08 | 0.40 | >15 | 9.8 |
+| ≥ 0.90 | model top-k | 0.10 | 0.50 | >15 | 6.5 |
+| ≥ 0.90 | model-seeded greedy | 0.08 | 0.40 | >15 | 3.8 |
+
+\*Failures count as 16 trials, so ">15" means more than half of the runs failed.
 
 Reading this honestly:
 
-- **The model helps most at moderate targets.** At ≥ 0.70, model top-k reaches the target in a
-  median of 4 trials versus 6 for the manual hill climb, and needs fewer trials in 46% of runs
-  (more in 23%).
-- **The gains are modest and shrink at high targets.** At ≥ 0.80 and ≥ 0.90, open-loop model
-  top-k succeeds *less* often than the manual climb. It never learns from its own results, and
-  the model is least accurate near the optimum. The best performer at those targets,
-  model-seeded greedy, is only slightly better than manual greedy.
-- **The first recommendation is optimistic.** It averages 0.749 predicted against 0.695 true (+0.053),
-  the expected optimiser's-curse bias.
+- **At ≥ 0.70 the model's first recipe works for every feed where the target is reachable**
+  (median 1 trial versus 6 for the manual climb). Model guidance needed fewer trials in 67% of
+  runs and more in none.
+- **At ≥ 0.80 the model now clearly helps.** Model top-k succeeds in 94% of reachable runs
+  versus 73% for the manual climb, and needs 2.2 trials on average when it succeeds, against
+  8.3.
+- **At ≥ 0.90 it barely helps.** Success is 0.10 against 0.08, and in 87–89% of runs both
+  approaches need the same number of trials, usually because both fail.
+- **The first recommendation is now nearly unbiased.** It averages 0.791 predicted against
+  0.782 true (+0.008, sd 0.091), down from +0.053 with gradient boosting.
 - **Many targets are physically out of reach.** An oracle search on the noise-free simulator
-  shows ≥ 0.90 is reachable for only 20% of feeds. No strategy can succeed on the rest.
+  shows ≥ 0.90 is reachable for only 20% of feeds and ≥ 0.80 for 62%. No strategy can succeed
+  on the rest.
 
 ## Figures
 
@@ -230,23 +255,32 @@ EDA: [distributions](reports/figures/eda_distributions.png) ·
 
 ## Limitations
 
-- **Synthetic, invented data.** The simulator has a known, smooth structure. Real processes
-  bring measurement drift, unrecorded variables and correlated recipes that this does not
-  capture. The numbers above show only that the workflow runs as designed.
-- **Few batches.** With 12 batches, batch-level estimates are noisy. The held-out RMSE (0.162,
-  3 batches) is worse than the CV estimate (0.125) and has a −0.06 bias. That is what one
-  unlucky set of batches looks like, and it is why the CV spread is reported.
-- **Wide intervals.** The conformal interval is about ±0.22 wide, and its width is constant even
-  though the simulator's noise is heteroscedastic. Coverage was 0.86 on the test batches and
-  0.93 on the example lab set, against 0.90 nominal. The guarantee is approximate: the final
-  model is refit on all folds, and the batches are few.
-- **The bootstrap spread under-covers** (0.50 against 0.90). This is expected, because it ignores
-  noise and batch effects. It also barely grows off-distribution, because trees extrapolate
-  flat: 0.050 in-distribution against 0.052 on clearly OOD feeds. So OOD detection relies on
-  the explicit range and Mahalanobis checks, not on the spread.
-- **Missed interaction.** The model does not learn the feed-type-specific pH optimum. It
-  recommends pH ≈ 2.0–2.1 for all three feed types, whereas the simulator's optima are 1.2, 1.8
-  and 2.3. This is a main reason open-loop recommendations fall short at high targets.
+- **Synthetic, invented data.** The simulator has a known, smooth structure, which favours
+  smooth models such as GPs. Real processes bring measurement drift, unrecorded variables and
+  correlated recipes that this does not capture. The numbers above show only that the workflow
+  runs as designed.
+- **Feature choices were informed by the simulator's design.** The engineered features (log
+  time and size, inverse absolute temperature, pH² and pH × feed type) are generic kinetic
+  priors. But the pH × feed-type interaction was added after an earlier version of the model
+  missed a feed-type-specific pH optimum, and I wrote the simulator. On real data such
+  features would have to come from domain knowledge and be validated the same way.
+- **Weak with very few trials.** At 30 trials the GP ensemble is slightly worse than gradient
+  boosting (RMSE 0.185 vs 0.176). With under about 50 trials, a simpler model may be the
+  better choice.
+- **Few batches.** With 12 batches, batch-level estimates are noisy. The held-out set (3
+  batches) shows a −0.055 bias, because a whole batch can be over- or under-predicted
+  together.
+- **Interval coverage below nominal on the test batches.** The intervals are narrower than
+  before (about ±0.17, mean width 0.31), but coverage was 0.83 on the test batches against
+  0.90 nominal. On the example lab set it was 0.93. The width is constant, so it ignores the
+  simulator's heteroscedastic noise, and the guarantee is approximate: the final model is
+  refit on all folds, and the batches are few.
+- **The bootstrap spread under-covers** (0.58 against 0.90). It measures model disagreement,
+  not noise. It grows only slightly off-distribution (0.050 in-distribution vs 0.060 on
+  clearly OOD feeds), so OOD detection relies on the explicit range and Mahalanobis checks.
+- **Partly learned interaction.** For grade 3% and particle size 120 µm, the recommended pH is
+  1.55, 1.99 and 2.37 for feed types A, B and C, against simulator optima of 1.2, 1.8 and
+  2.3. That is much closer than before (≈ 2.0 for all three), but not exact.
 - **The recommender is open loop** and is bounded by the training range. It cannot propose
   recipes outside what has been tried, and it warns when the optimum sits on a bound.
 - **Simple OOD detection.** Range checks plus a 2-D Mahalanobis distance on feed composition
@@ -262,7 +296,8 @@ src/leach/
   simulate.py            invented simulator + virtual lab
   schema.py              pydantic validation built from config
   eda.py, plots.py       figures
-  models.py              pipelines, bounded regressor, candidate registry
+  features.py            config-driven feature engineering
+  models.py              pipelines, bounded regressor, GP/ensemble candidate registry
   evaluation.py          metrics, grouped splits, nested CV, learning curve
   uncertainty.py         grouped-CV conformal, batch bootstrap, coverage
   ood.py                 out-of-distribution detector
