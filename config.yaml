@@ -154,7 +154,7 @@ recommend:
     recombination: 0.7
 
 trial_study:
-  n_runs: 40
+  n_runs: 100
   budget: 15
   targets: [0.70, 0.80, 0.90]
   cost_weight: 0.0
