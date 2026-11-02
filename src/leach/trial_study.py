@@ -231,13 +231,27 @@ def md_table(df: pd.DataFrame, floatfmt: str = ".2f") -> str:
 def _no_help_findings(summary: pd.DataFrame, runs: pd.DataFrame, budget: int) -> list[str]:
     """Data-driven list of situations where model guidance did not beat the manual climb."""
     out = []
-    piv = summary.pivot(index="target", columns="strategy", values="median_trials_censored")
-    for target, row in piv.iterrows():
-        best_model = min(row["model_top_k"], row["model_seeded_greedy"])
-        if best_model >= row["manual_greedy"]:
+    model_strategies = ("model_top_k", "model_seeded_greedy")
+    for target, sub in summary.groupby("target"):
+        s = sub.set_index("strategy")
+        manual = s.loc["manual_greedy"]
+        for strat in model_strategies:
+            if s.loc[strat, "success_rate"] < manual["success_rate"]:
+                out.append(
+                    f"target {target:.2f}: {strat} success rate {s.loc[strat, 'success_rate']:.2f} "
+                    f"is below manual_greedy ({manual['success_rate']:.2f})."
+                )
+        medians = s.loc[[*model_strategies, "manual_greedy"], "median_trials_censored"]
+        if (medians > budget).all():
+            out.append(
+                f"target {target:.2f}: the median run of every strategy failed within {budget} "
+                "trials, so median trial counts cannot separate them."
+            )
+        elif medians[list(model_strategies)].min() >= manual["median_trials_censored"]:
             out.append(
                 f"target {target:.2f}: no model-guided strategy beat manual_greedy on median "
-                f"trials ({best_model:.1f} vs {row['manual_greedy']:.1f})."
+                f"trials ({medians[list(model_strategies)].min():.1f} vs "
+                f"{manual['median_trials_censored']:.1f})."
             )
     by_type = (
         runs.assign(success=runs["trials_to_target"].notna())

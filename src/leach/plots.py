@@ -46,9 +46,24 @@ plt.rcParams.update(
 )
 
 
-def _save(fig: plt.Figure, path: Path) -> Path:
+LEGEND_BAND = 0.07  # fraction of figure height reserved for a figure-level legend
+
+
+def _legend_below(fig: plt.Figure, ax: plt.Axes, title: str | None = None) -> None:
+    handles, labels = ax.get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        ncol=len(labels),
+        title=title,
+        bbox_to_anchor=(0.5, 0.0),
+    )
+
+
+def _save(fig: plt.Figure, path: Path, legend_below: bool = False) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    fig.tight_layout()
+    fig.tight_layout(rect=(0, LEGEND_BAND if legend_below else 0, 1, 1))
     fig.savefig(path, dpi=DPI)
     plt.close(fig)
     return path
@@ -107,9 +122,9 @@ def recovery_vs_features(
     for ax in list(axes.flat)[len(columns) :]:
         ax.set_visible(False)
     axes.flat[0].set_ylabel(target)
-    axes.flat[0].legend(title=hue, title_fontsize=8)
+    _legend_below(fig, axes.flat[0])
     fig.suptitle(f"{target} vs features, by {hue}", color=TEXT_PRIMARY)
-    return _save(fig, path)
+    return _save(fig, path, legend_below=True)
 
 
 def model_comparison(summary: pd.DataFrame, path: Path) -> Path:
@@ -186,5 +201,5 @@ def cumulative_success(curves: Mapping[float, pd.DataFrame], budget: int, path: 
         ax.set(xlabel="trials run", xlim=(1, budget), ylim=(0, 1.02))
         ax.set_title(f"target recovery >= {target:.2f}")
     axes[0].set_ylabel("fraction of runs at target")
-    axes[0].legend(loc="upper left")
-    return _save(fig, path)
+    _legend_below(fig, axes[0])
+    return _save(fig, path, legend_below=True)
